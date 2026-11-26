@@ -45,8 +45,8 @@ h1{font:700 clamp(30px,6vw,50px)/1.05 var(--px);margin:0;letter-spacing:.5px;tex
  background:repeating-linear-gradient(90deg,#c9a24a 0 6px,transparent 6px 10px);border-radius:2px;opacity:.9}
 .silk{position:absolute;font:500 12px/1 var(--px);color:#d9d6e6;opacity:.75;white-space:nowrap}
 .silk.l{left:30px;top:8px}.silk.r{right:30px;top:8px}.silk.b1{left:16px;bottom:10px}.silk.b2{right:16px;bottom:10px}
-.screen{position:relative;width:min(90vw,calc((100vh - 250px) * .75),480px);aspect-ratio:3/4;background:#000;border-radius:4px;overflow:hidden;box-shadow:0 0 0 3px #19161f,0 0 0 4px #33303d}
-@supports (height:100svh){.screen{width:min(90vw,calc((100svh - 250px) * .75),480px)}}
+.screen{position:relative;width:min(90vw,calc((100vh - 350px) * .75),480px);aspect-ratio:3/4;background:#000;border-radius:4px;overflow:hidden;box-shadow:0 0 0 3px #19161f,0 0 0 4px #33303d}
+@supports (height:100svh){.screen{width:min(90vw,calc((100svh - 350px) * .75),480px)}}
 canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;cursor:pointer}
 .toast{position:absolute;left:6%;right:6%;bottom:5%;padding:10px 12px;border-radius:10px;background:rgba(13,6,24,.92);border:2px solid var(--teal);font:500 15px/1.3 var(--px);text-align:center;pointer-events:none}
 .toast[data-k=good]{border-color:var(--yellow);color:#fff7d6}
@@ -57,7 +57,7 @@ canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rend
 .snd{min-height:38px;padding:0 16px;font:500 15px/1 var(--px);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px}
 .snd[aria-pressed=false]{color:var(--dim)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
-.namecard{width:100%;max-width:480px;display:grid;gap:8px}
+.namecard{width:100%;max-width:480px;display:grid;gap:6px;padding:12px 14px}
 label{font-weight:600}
 .row{display:flex;gap:8px}
 input{flex:1;font:500 18px/1.2 var(--px);color:var(--ink);background:#0d0618;border:2px solid var(--line);border-radius:10px;padding:10px 12px;min-height:46px}
@@ -67,7 +67,7 @@ button:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
 button[hidden]{display:none}
 .hint{margin:0;color:var(--dim);font-size:14px}
 .hint.bad{color:var(--pink)}
-.result{margin:0;min-height:1.5em;font-size:15px}
+.result{margin:0;min-height:1.5em;font-size:15px;text-align:center;max-width:480px}
 .side{display:grid;gap:16px}
 .beat{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .beat div{display:grid;gap:2px}
@@ -106,6 +106,14 @@ footer{max-width:1080px;margin:0 auto;padding:8px max(4vw,14px) 32px;color:var(-
 
 <main class="wrap">
   <section class="stage">
+    <div class="card namecard">
+      <label for="name">Your name on the phone</label>
+      <div class="row">
+        <input id="name" maxlength="12" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="done" placeholder="Player">
+        <button id="send" type="button" hidden>Send</button>
+      </div>
+      <p id="hint" class="hint">Up to 12 letters or numbers. It shows on the phone's screen.</p>
+    </div>
     <div class="pcb">
       <span class="silk l">s3 phone v2</span><span class="silk r">4G</span>
       <div class="screen">
@@ -114,17 +122,9 @@ footer{max-width:1080px;margin:0 auto;padding:8px max(4vw,14px) 32px;color:var(-
       </div>
       <span class="silk b1">esp32-s3</span><span class="silk b2">sim7600g-h</span>
     </div>
+    <p id="result" class="result" aria-live="polite"></p>
     <p class="keys">Tap the left or right side to change lanes. On a computer, use the arrow keys (M turns the sound on or off).</p>
     <button id="snd" class="snd" type="button" aria-pressed="true">🔊 Sound on</button>
-    <div class="card namecard">
-      <label for="name">Your name on the phone</label>
-      <div class="row">
-        <input id="name" maxlength="12" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="send" placeholder="e.g. Ravi">
-        <button id="send" type="button" hidden>Send</button>
-      </div>
-      <p id="hint" class="hint">Up to 12 letters or numbers. It shows on the phone's screen.</p>
-      <p id="result" class="result" aria-live="polite"></p>
-    </div>
   </section>
 
   <section class="side">
@@ -904,7 +904,9 @@ const pill = $('pill'), pillText = pill.querySelector('span'), nameEl = $('name'
 const resultEl = $('result'), boardEl = $('board'), playsEl = $('plays'), phoneBestEl = $('phoneBest'), myBestEl = $('myBest');
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, val) { try { localStorage.setItem(k, val); } catch (e) { /* private mode */ } } };
 const fmt = n => Number(n).toLocaleString('en-IN');
-const HINT = "Up to 12 letters or numbers. It shows on the phone's screen.";
+/* a player who leaves the name empty still goes on the phone, as 'Player 1234' (kept on this browser) */
+const AUTO_NAME = (() => { let a = store.get('hh_auto'); if (!/^Player \d{4}$/.test(a || '')) { a = 'Player ' + (1000 + Math.floor(Math.random() * 9000)); store.set('hh_auto', a); } return a; })();
+const HINT = 'Leave it empty to play as ' + AUTO_NAME + '. Up to 12 letters or numbers.';
 const PHONE_TEXT = { checking: 'Checking the phone…', online: 'Phone is online', offline: 'Phone is off right now', noserver: "Can't reach the score server" };
 
 let phone = 'checking', lastLive = 0, upAt = 0, myBest = 0, sentBest = 0, lastSend = 0, sendTimer = 0, toastTimer = 0, boardTop = [];
@@ -934,6 +936,7 @@ function toast(text, kind, ms) {
   clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(() => { toastEl.hidden = true; }, ms);
 }
 function cleanName() { return nameEl.value.trim().replace(/\s+/g, ' '); }
+const playName = () => cleanName() || AUTO_NAME;
 function nameProblem(n) {
   if (!n) return 'empty';
   if (!/^[A-Za-z0-9 _.\-]{1,12}$/.test(n)) return 'Use only letters, numbers, space, _ . or - (up to 12).';
@@ -945,7 +948,7 @@ function rid(n) { const a = 'abcdefghijklmnopqrstuvwxyz0123456789', b = new Uint
 function refreshName() {
   const p = nameProblem(cleanName());
   hintEl.textContent = p && p !== 'empty' ? p : HINT; hintEl.classList.toggle('bad', !!p && p !== 'empty');
-  sendBtn.hidden = !box || box.flying; sendBtn.disabled = !!p;
+  sendBtn.hidden = !box || box.flying; sendBtn.disabled = !!p && p !== 'empty';
   if (box) sendBtn.textContent = 'Send ' + fmt(box.score);
   renderBoard();
 }
@@ -954,13 +957,23 @@ nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefa
 nameEl.addEventListener('change', () => { if (!nameProblem(cleanName())) store.set('hh_name', cleanName()); });
 sendBtn.addEventListener('click', () => trySend());
 
+/* Every game goes to the phone. While one score is waiting or on its way, the next game waits in
+   nextBox (the better one if there are several) and goes once the phone has answered. */
+let nextBox = null;
 hooks.crash = (sc, t) => {
   if (sc > myBest) { myBest = sc; store.set('hh_best', String(sc)); myBestEl.textContent = fmt(sc); }
-  if (sc >= 1 && sc > sentBest && (!box || sc > box.score)) { box = { score: sc, t: Math.max(1, Math.ceil(t)), id: null, flying: false }; saveBox(); }
-  else if (!box || box.flying) { if (sentBest) toast('Beat ' + fmt(sentBest) + ' to send a new score to the phone.', 'info', 4000); return; }
+  if (sc < 1) return;
+  const nb = { score: sc, t: Math.max(1, Math.ceil(t)), id: null, flying: false };
+  if (!box) { box = nb; saveBox(); }
+  else if (!nextBox || sc > nextBox.score) nextBox = nb;
   refreshName();
   trySend();
 };
+function promote() {
+  if (!nextBox || (box && box.flying)) return;
+  if (!box || nextBox.score > box.score) { box = nextBox; saveBox(); }
+  nextBox = null; refreshName(); trySend();
+}
 
 function holdMsg() {
   if (!box) return;
@@ -971,18 +984,14 @@ function holdMsg() {
 }
 function trySend() {
   if (!box || box.flying) return;
-  const n = cleanName(), p = nameProblem(n);
-  if (p) {
-    refreshName();
-    toast(p !== 'empty' ? p : 'Type your name under the game to send ' + fmt(box.score) + ' to the phone.', p !== 'empty' ? 'bad' : 'info', 6000);
-    return;
-  }
-  store.set('hh_name', n);
+  const n = playName(), p = nameProblem(n);
+  if (p) { refreshName(); toast(p, 'bad', 6000); return; }
+  if (cleanName()) store.set('hh_name', n);
   if (phone !== 'online') { holdMsg(); refreshName(); return; }
   const wait = lastSend + SEND_GAP_MS - Date.now();
   if (wait > 0) {
     clearTimeout(sendTimer); sendTimer = setTimeout(trySend, wait);
-    toast('New best! It goes to the phone in a few seconds.', 'info', 4000); refreshName(); return;
+    toast('Your ' + fmt(box.score) + ' goes to the phone in a few seconds.', 'info', 4000); refreshName(); return;
   }
   if (!box.id) box.id = rid(8);
   box.flying = true; saveBox();
@@ -1023,6 +1032,7 @@ function onAck(id, j) {
     if (j.why === 'slow') { clearTimeout(sendTimer); sendTimer = setTimeout(trySend, SEND_GAP_MS); }
   }
   refreshName();
+  if (j.ok === true || j.why !== 'name') promote();     /* a refused name waits for the player to change it */
 }
 
 function onBoard(j) {
@@ -1033,7 +1043,7 @@ function onBoard(j) {
 }
 function renderBoard() {
   if (!boardTop) return;
-  const me = cleanName().toLowerCase(), items = [];
+  const me = playName().toLowerCase(), items = [];
   for (const e of boardTop) {
     const li = document.createElement('li'), n = document.createElement('span'), s = document.createElement('span');
     if (e.n === PHONE) li.className = 'phone'; else if (me && e.n.toLowerCase() === me) li.className = 'me';
@@ -1069,6 +1079,7 @@ setInterval(() => {
 }, 1000);
 
 nameEl.value = store.get('hh_name') || '';
+nameEl.placeholder = AUTO_NAME;
 loadBox();
 if (box) resultEl.textContent = 'Your score of ' + fmt(box.score) + ' is waiting to go to the phone.';
 myBest = best = Math.max(0, parseInt(store.get('hh_best') || '0', 10) || 0);
