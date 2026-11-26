@@ -167,7 +167,14 @@ footer{max-width:1080px;margin:0 auto;padding:8px max(4vw,14px) 32px;color:var(-
 'use strict';
 /* ============================== config ============================== */
 const QS = new URLSearchParams(location.search);
-const BROKER = QS.get('broker') || 'wss://test.mosquitto.org:8081';
+/* score server. The login is the public 'player' account: the broker only lets it send scores
+   and read the board, so it is safe to have it in the page. Empty user = no login. */
+const BROKER_DEFAULT = 'wss://nagaraju.in:8884/mqtt';
+const USER_DEFAULT = 'player';
+const PASS_DEFAULT = '1Dt3UOh7atpryu7TO4m1';
+const BROKER = QS.get('broker') || BROKER_DEFAULT;
+const MQTT_USER = QS.has('broker') ? (QS.get('user') || '') : USER_DEFAULT;
+const MQTT_PASS = QS.has('broker') ? (QS.get('pass') || '') : PASS_DEFAULT;
 const PFX = /^hh-[a-z0-9]{6}\/$/.test(QS.get('prefix') || '') ? QS.get('prefix') : 'hh-jex92y/';   /* the phone's MP_PREFIX */
 const PHONE = 'Homemade Phone';
 const SEND_GAP_MS = 12000;        /* the phone takes one score per name every 10 s */
@@ -718,12 +725,16 @@ function cat(...p) { let n = 0; for (const x of p) n += x.length; const o = new 
 function mstr(s) { const b = te.encode(s); return cat(u8(b.length >> 8, b.length & 255), b); }
 function pk(type, body) { const l = []; let n = body.length; do { let d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; l.push(d); } while (n > 0); return cat(u8(type), Uint8Array.from(l), body); }
 class Mq {
-  constructor(url, cid, onMsg, onState) { Object.assign(this, { url, cid, onMsg, onState }); this.up = false; this.subs = new Set(); this.out = []; this.fly = new Map(); this.mid = 0; this.wait = 1000; this.buf = new Uint8Array(0); }
+  constructor(url, cid, onMsg, onState, user, pass) { Object.assign(this, { url, cid, onMsg, onState, user, pass }); this.up = false; this.subs = new Set(); this.out = []; this.fly = new Map(); this.mid = 0; this.wait = 1000; this.buf = new Uint8Array(0); }
   connect() {
     let ws;
     try { ws = new WebSocket(this.url, ['mqtt']); } catch (e) { this.onState('down'); this.retry(); return; }
     this.ws = ws; ws.binaryType = 'arraybuffer'; this.buf = new Uint8Array(0);
-    ws.onopen = () => { dbg('server: connected, logging in'); this.raw(pk(0x10, cat(mstr('MQTT'), u8(4, 0x02, 0, 90), mstr(this.cid)))); };
+    ws.onopen = () => {
+      dbg('server: connected, logging in');
+      const flags = 0x02 | (this.user ? 0x80 : 0) | (this.user && this.pass ? 0x40 : 0);
+      this.raw(pk(0x10, cat(mstr('MQTT'), u8(4, flags, 0, 90), mstr(this.cid), this.user ? mstr(this.user) : new Uint8Array(0), this.user && this.pass ? mstr(this.pass) : new Uint8Array(0))));
+    };
     ws.onmessage = e => { if (e.data instanceof ArrayBuffer) this.feed(new Uint8Array(e.data)); };
     ws.onclose = e => { dbg('server: closed (' + e.code + ')'); this.up = false; clearInterval(this.ping); this.onState('down'); this.retry(); };
     ws.onerror = () => {};
@@ -940,7 +951,7 @@ function onMsg(topic, payload, retained) {
 const mq = new Mq(BROKER, 'hhweb-' + rid(8), onMsg, s => {
   if (s === 'up') { upAt = Date.now(); if (phone === 'noserver') setPhone('checking'); }
   else setPhone('noserver');
-});
+}, MQTT_USER, MQTT_PASS);
 const seenEl = $('seen');
 setInterval(() => {
   const ago = lastLive ? Math.round((Date.now() - lastLive) / 1000) : -1;
