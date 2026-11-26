@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hyderabad Hustle vs my 4G phone</title>
+<meta name="description" content="Play Hyderabad Hustle in your browser. When you crash, your score pops up on a homemade 4G phone.">
+<meta property="og:title" content="Hyderabad Hustle vs my homemade 4G phone">
+<meta property="og:description" content="Dodge autos and buses. When you crash, your score pops up on my homemade phone over 4G.">
+<meta name="theme-color" content="#0d0618">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a night arcade, playful and tidy
+   IDEA: the homemade phone's bare black circuit board, with the game on its screen
+   PICTURE: the live game in a black PCB housing with gold pads and white silkscreen
+   COLOUR and TYPE: the game's own night palette (plum, neon pink, teal, yellow); Pixelify Sans + system UI
+   LAYOUT: screen first; name and result under it; score to beat and the board beside it, stacked on phones */
+:root{color-scheme:dark;--bg:#0d0618;--card:#170d2c;--card2:#1f1438;--line:#2f2352;--ink:#f4f2ff;--dim:#aaa6c6;--pink:#ff2e97;--teal:#19f5e1;--yellow:#ffd23f;--red:#ff5a6a;--px:"Pixelify Sans",ui-monospace,monospace}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:clip;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+a{color:var(--teal)}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;max-width:1080px;margin:0 auto;padding:18px max(4vw,14px) 10px}
+h1{font:700 clamp(30px,6vw,50px)/1.05 var(--px);margin:0;letter-spacing:.5px;text-wrap:balance}
+.top p{margin:6px 0 0;color:var(--dim);max-width:46ch}
+.pill{display:inline-flex;align-items:center;gap:9px;padding:8px 14px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:15px;white-space:nowrap}
+.pill i{width:10px;height:10px;border-radius:50%;background:var(--dim);flex:none}
+.pill small{color:var(--dim);font-size:13px}
+.pill small:empty{display:none}
+#dbg{max-width:1080px;margin:0 auto 24px;padding:10px max(4vw,14px);font:12px/1.45 ui-monospace,Menlo,monospace;color:#c9c5e0;white-space:pre-wrap;overflow-wrap:anywhere}
+#dbg[hidden]{display:none}
+.pill[data-s=online] i{background:var(--teal);animation:ping 1.6s ease-out infinite}
+.pill[data-s=offline] i{background:var(--pink)}
+.pill[data-s=noserver] i{background:var(--red)}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(25,245,225,.55)}100%{box-shadow:0 0 0 10px rgba(25,245,225,0)}}
+.wrap{display:grid;grid-template-columns:auto minmax(0,1fr);gap:24px 36px;max-width:1080px;margin:0 auto;padding:6px max(4vw,14px) 28px;align-items:start}
+.stage{display:grid;gap:12px;justify-items:center}
+.pcb{position:relative;padding:26px 14px 30px;border-radius:20px;background:
+ radial-gradient(circle at 16px 16px,#c9a24a 0 4px,#0b0a10 4.5px 7px,transparent 7.5px),
+ radial-gradient(circle at calc(100% - 16px) 16px,#c9a24a 0 4px,#0b0a10 4.5px 7px,transparent 7.5px),
+ #0b0a10;box-shadow:inset 0 0 0 1px #26222f,0 22px 50px rgba(0,0,0,.5)}
+.pcb::after{content:"";position:absolute;left:50%;bottom:9px;width:96px;height:10px;transform:translateX(-50%);
+ background:repeating-linear-gradient(90deg,#c9a24a 0 6px,transparent 6px 10px);border-radius:2px;opacity:.9}
+.silk{position:absolute;font:500 12px/1 var(--px);color:#d9d6e6;opacity:.75;white-space:nowrap}
+.silk.l{left:30px;top:8px}.silk.r{right:30px;top:8px}.silk.b1{left:16px;bottom:10px}.silk.b2{right:16px;bottom:10px}
+.screen{position:relative;width:min(90vw,calc((100vh - 250px) * .75),480px);aspect-ratio:3/4;background:#000;border-radius:4px;overflow:hidden;box-shadow:0 0 0 3px #19161f,0 0 0 4px #33303d}
+@supports (height:100svh){.screen{width:min(90vw,calc((100svh - 250px) * .75),480px)}}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;cursor:pointer}
+.toast{position:absolute;left:6%;right:6%;bottom:5%;padding:10px 12px;border-radius:10px;background:rgba(13,6,24,.92);border:2px solid var(--teal);font:500 15px/1.3 var(--px);text-align:center;pointer-events:none}
+.toast[data-k=good]{border-color:var(--yellow);color:#fff7d6}
+.toast[data-k=bad]{border-color:var(--pink)}
+.toast.up{top:7%;bottom:auto}
+.toast[hidden]{display:none}
+.keys{margin:0;color:var(--dim);font-size:14px;text-align:center;max-width:40ch}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.namecard{width:100%;max-width:480px;display:grid;gap:8px}
+label{font-weight:600}
+.row{display:flex;gap:8px}
+input{flex:1;font:500 18px/1.2 var(--px);color:var(--ink);background:#0d0618;border:2px solid var(--line);border-radius:10px;padding:10px 12px;min-height:46px}
+input:focus{outline:none;border-color:var(--teal)}
+button{font:700 16px/1 var(--px);color:#1a0b14;background:var(--yellow);border:0;border-radius:10px;padding:0 16px;min-height:46px;cursor:pointer;white-space:nowrap}
+button:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+button[hidden]{display:none}
+.hint{margin:0;color:var(--dim);font-size:14px}
+.hint.bad{color:var(--pink)}
+.result{margin:0;min-height:1.5em;font-size:15px}
+.side{display:grid;gap:16px}
+.beat{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.beat div{display:grid;gap:2px}
+.lbl{color:var(--dim);font-size:14px}
+.beat strong{font:700 clamp(34px,5vw,46px)/1 var(--px);color:var(--yellow)}
+.beat div+div strong{color:var(--ink)}
+h2{font:700 22px/1.2 var(--px);margin:0 0 10px}
+ol.board{list-style:none;margin:0;padding:0;counter-reset:r}
+ol.board li{counter-increment:r;display:grid;grid-template-columns:2.2em minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:7px 4px;border-top:1px solid var(--line);font-size:16px}
+ol.board li:first-child{border-top:0}
+ol.board li::before{content:counter(r);font:700 16px/1 var(--px);color:var(--dim)}
+ol.board li .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ol.board li .s{font:700 18px/1 var(--px);text-align:right;white-space:nowrap}
+ol.board li.phone .n,ol.board li.phone .s{color:var(--pink)}
+ol.board li.me{background:rgba(25,245,225,.08);border-radius:8px}
+ol.board li.me .n::after{content:" (you)";color:var(--teal)}
+ol.board li.empty{display:block;color:var(--dim)}
+ol.board li.empty::before{content:none}
+.sub{margin:8px 0 0;color:var(--dim);font-size:14px}
+.how svg{display:block;width:100%;height:auto;margin:2px 0 10px}
+.how ol{margin:0;padding-left:1.3em;display:grid;gap:6px}
+footer{max-width:1080px;margin:0 auto;padding:8px max(4vw,14px) 32px;color:var(--dim);font-size:14px}
+@media (max-width:820px){.wrap{grid-template-columns:minmax(0,1fr)}.side{max-width:520px;width:100%;justify-self:center}}
+@media (max-width:600px){.top{padding-top:12px}.top p{font-size:15px}.silk{font-size:11px}}
+@media (prefers-reduced-motion:reduce){.pill i{animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>Hyderabad Hustle</h1>
+    <p>Crash, and your score pops up on my homemade phone over its own 4G SIM.</p>
+  </div>
+  <div id="pill" class="pill" data-s="checking" role="status"><i></i><span>Checking the phone…</span><small id="seen"></small></div>
+</header>
+
+<main class="wrap">
+  <section class="stage">
+    <div class="pcb">
+      <span class="silk l">s3 phone v2</span><span class="silk r">4G</span>
+      <div class="screen">
+        <canvas id="game" width="240" height="320" aria-label="Hyderabad Hustle. Tap the left or right side to change lanes."></canvas>
+        <div id="toast" class="toast" hidden></div>
+      </div>
+      <span class="silk b1">esp32-s3</span><span class="silk b2">sim7600g-h</span>
+    </div>
+    <p class="keys">Tap the left or right side to change lanes. On a computer, use the arrow keys.</p>
+    <div class="card namecard">
+      <label for="name">Your name on the phone</label>
+      <div class="row">
+        <input id="name" maxlength="12" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="send" placeholder="e.g. Ravi">
+        <button id="send" type="button" hidden>Send</button>
+      </div>
+      <p id="hint" class="hint">Up to 12 letters or numbers. It shows on the phone's screen.</p>
+      <p id="result" class="result" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="side">
+    <div class="card beat">
+      <div><span class="lbl">Score to beat</span><strong id="phoneBest">–</strong><span class="lbl">the phone's own best</span></div>
+      <div><span class="lbl">Your best</span><strong id="myBest">0</strong><span class="lbl">on this browser</span></div>
+    </div>
+    <div class="card">
+      <h2>Top 10 on the phone</h2>
+      <ol id="board" class="board"><li class="empty">Waiting for the leaderboard…</li></ol>
+      <p id="plays" class="sub"></p>
+    </div>
+    <div class="card how">
+      <h2>How your score gets there</h2>
+      <svg viewBox="0 0 330 92" role="img" aria-label="Your browser sends the score to an MQTT server, and the phone receives it over 4G">
+        <g fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="18" width="78" height="52" rx="7" stroke="#19f5e1"/><path d="M6 30h78" stroke="#19f5e1"/>
+          <circle cx="15" cy="24" r="1.8" fill="#19f5e1" stroke="none"/><circle cx="22" cy="24" r="1.8" fill="#19f5e1" stroke="none"/>
+          <path d="M36 52l8-12 8 12" stroke="#ffd23f"/>
+          <path d="M92 44h40" stroke="#aaa6c6" stroke-dasharray="4 5"/><path d="M126 38l7 6-7 6" stroke="#aaa6c6"/>
+          <path d="M150 62h44a14 14 0 0 0 0-28 20 20 0 0 0-38-4 15 15 0 0 0-6 32z" stroke="#ffd23f"/>
+          <path d="M204 44h40" stroke="#aaa6c6" stroke-dasharray="4 5"/><path d="M238 38l7 6-7 6" stroke="#aaa6c6"/>
+          <rect x="262" y="8" width="46" height="76" rx="6" stroke="#ff2e97"/><rect x="269" y="17" width="32" height="42" rx="2" stroke="#ff2e97"/>
+          <path d="M276 72h18" stroke="#ff2e97"/><path d="M314 30a10 10 0 0 1 0 14M320 25a18 18 0 0 1 0 24" stroke="#19f5e1"/>
+        </g>
+        <text x="45" y="88" fill="#aaa6c6" font-size="12" text-anchor="middle" font-family="system-ui,sans-serif">your browser</text>
+        <text x="172" y="88" fill="#aaa6c6" font-size="12" text-anchor="middle" font-family="system-ui,sans-serif">MQTT server</text>
+      </svg>
+      <ol>
+        <li>You crash. This page sends your name and score to a free MQTT server.</li>
+        <li>My phone listens to that server over its SIM card's 4G data. No Wi-Fi.</li>
+        <li>It beeps, shows your name and replies with your rank.</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<pre id="dbg" hidden></pre>
+<footer>Made by <a href="https://www.instagram.com/nagaraju.builds/">@nagaraju.builds</a>. Only your name and score are sent, and names on the board are public.</footer>
+
+<script>
+{
+'use strict';
+/* ============================== config ============================== */
+const QS = new URLSearchParams(location.search);
+const BROKER = QS.get('broker') || 'wss://test.mosquitto.org:8081';
+const PFX = /^hh-[a-z0-9]{6}\/$/.test(QS.get('prefix') || '') ? QS.get('prefix') : 'hh-jex92y/';   /* the phone's MP_PREFIX */
+const PHONE = 'Homemade Phone';
+const SEND_GAP_MS = 12000;        /* the phone takes one score per name every 10 s */
+const ACK_WAIT_MS = 15000;
+const LIVE_MS = 70000;            /* the phone sends a live status every 20 s */
+const CHECK_MS = 45000;           /* how long to wait for the first one */
+const DEBUG = location.protocol === 'file:' || QS.has('debug');   /* live log when testing locally */
+
+/* ======================= gfx: port of game_gfx.c ===================== */
+const GW = 240, GH = 320;
+const pack = (r5, g6, b5) => (0xFF000000 | (((b5 << 3) | (b5 >> 2)) << 16) | (((g6 << 2) | (g6 >> 4)) << 8) | ((r5 << 3) | (r5 >> 2))) >>> 0;
+const rgb = h => pack((h >>> 19) & 31, (h >>> 10) & 63, (h >>> 3) & 31);   /* same RGB565 colours as the phone */
+let T = null, CX0 = 0, CY0 = 0, CX1 = GW, CY1 = GH;
+const PAL = new Uint32Array(128);
+const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+function gtarget(b) { T = b; }
+function gclip(x0, y0, x1, y1) { CX0 = x0 < 0 ? 0 : x0; CY0 = y0 < 0 ? 0 : y0; CX1 = x1 > GW ? GW : x1; CY1 = y1 > GH ? GH : y1; }
+function gclipAll() { gclip(0, 0, GW, GH); }
+function gpal(ch, c) { PAL[ch.charCodeAt(0) & 127] = c; }
+function gpx(x, y, c) { if (x >= CX0 && x < CX1 && y >= CY0 && y < CY1) T[y * GW + x] = c; }
+function cr(x, y, w, h) { let x0 = x, y0 = y, x1 = x + w, y1 = y + h; if (x0 < CX0) x0 = CX0; if (y0 < CY0) y0 = CY0; if (x1 > CX1) x1 = CX1; if (y1 > CY1) y1 = CY1; return (x1 <= x0 || y1 <= y0) ? null : [x0, y0, x1, y1]; }
+function gfill(x, y, w, h, c) { const r = cr(x, y, w, h); if (!r) return; for (let yy = r[1]; yy < r[3]; yy++) T.fill(c, yy * GW + r[0], yy * GW + r[2]); }
+function gfillDither(x, y, w, h, c) { const r = cr(x, y, w, h); if (!r) return; for (let yy = r[1]; yy < r[3]; yy++) { const o = yy * GW; for (let xx = r[0] + ((r[0] + yy) & 1); xx < r[2]; xx += 2) T[o + xx] = c; } }
+function gfillLevel(x, y, w, h, c, lv) { if (lv <= 0) return; const r = cr(x, y, w, h); if (!r) return; for (let yy = r[1]; yy < r[3]; yy++) { const row = BAYER[yy & 3], o = yy * GW; for (let xx = r[0]; xx < r[2]; xx++) if (row[xx & 3] < lv) T[o + xx] = c; } }
+function grect(x, y, w, h, t, c) { gfill(x, y, w, t, c); gfill(x, y + h - t, w, t, c); gfill(x, y + t, t, h - 2 * t, c); gfill(x + w - t, y + t, t, h - 2 * t, c); }
+function ehalf(dy, rx, ry) { const f = 1 - (dy * dy) / (ry * ry); return f <= 0 ? 0 : (rx * Math.sqrt(f) + 0.5) | 0; }
+function gellipse(cx, cy, rx, ry, c) { if (rx <= 0 || ry <= 0) return; for (let dy = -ry; dy <= ry; dy++) { const hw = ehalf(dy, rx, ry); gfill(cx - hw, cy + dy, 2 * hw + 1, 1, c); } }
+function gellipseDither(cx, cy, rx, ry, c) { if (rx <= 0 || ry <= 0) return; for (let dy = -ry; dy <= ry; dy++) { const hw = ehalf(dy, rx, ry); gfillDither(cx - hw, cy + dy, 2 * hw + 1, 1, c); } }
+function gellipseLevel(cx, cy, rx, ry, c, lv) { if (rx <= 0 || ry <= 0) return; for (let dy = -ry; dy <= ry; dy++) { const hw = ehalf(dy, rx, ry); gfillLevel(cx - hw, cy + dy, 2 * hw + 1, 1, c, lv); } }
+function gline(x0, y0, x1, y1, r, c) { const dx = x1 - x0, dy = y1 - y0, n = Math.max(Math.abs(dx), Math.abs(dy)); for (let i = 0; i <= n; i++) { const x = x0 + (n ? Math.trunc(dx * i / n) : 0), y = y0 + (n ? Math.trunc(dy * i / n) : 0); if (r <= 0) gpx(x, y, c); else gellipse(x, y, r, r, c); } }
+function gcopyRows(src, y0, n) { if (y0 < 0) { n += y0; y0 = 0; } if (y0 + n > GH) n = GH - y0; if (n > 0) T.set(src.subarray(y0 * GW, (y0 + n) * GW), y0 * GW); }
+function gsprite(s, x, y, sc) { const half = (s.w + 1) >> 1; for (let r = 0; r < s.h; r++) { const row = s.rows[r]; for (let c = 0; c < s.w; c++) { const ch = row[s.mirror ? (c < half ? c : s.w - 1 - c) : c]; if (!ch || ch === '.' || ch === ' ') continue; gfill(x + c * sc, y + r * sc, sc, sc, PAL[ch.charCodeAt(0) & 127]); } } }
+
+const FONT = [
+ ['!', '..#.. ..#.. ..#.. ..#.. ..#.. ..... ..#..'], ['"', '.#.#. .#.#.'], ['#', '.#.#. .#.#. ##### .#.#. ##### .#.#. .#.#.'],
+ ['%', '##..# ##..# ...#. ..#.. .#... #..## #..##'], ['&', '.##.. #..#. #.#.. .#... #.#.# #..#. .##.#'], ["'", '..#.. ..#..'],
+ ['(', '...#. ..#.. .#... .#... .#... ..#.. ...#.'], [')', '.#... ..#.. ...#. ...#. ...#. ..#.. .#...'],
+ ['*', '..... ..#.. #.#.# .###. #.#.# ..#.. .....'], ['+', '..... ..#.. ..#.. ##### ..#.. ..#.. .....'],
+ [',', '..... ..... ..... ..... ..... ..#.. ..#.. .#...'], ['-', '..... ..... ..... ##### ..... ..... .....'],
+ ['.', '..... ..... ..... ..... ..... ..... ..#..'], ['/', '....# ....# ...#. ..#.. .#... #.... #....'],
+ ['0', '.###. #...# #..## #.#.# ##..# #...# .###.'], ['1', '..#.. .##.. ..#.. ..#.. ..#.. ..#.. .###.'],
+ ['2', '.###. #...# ....# ...#. ..#.. .#... #####'], ['3', '##### ...#. ..#.. ...#. ....# #...# .###.'],
+ ['4', '...#. ..##. .#.#. #..#. ##### ...#. ...#.'], ['5', '##### #.... ####. ....# ....# #...# .###.'],
+ ['6', '..##. .#... #.... ####. #...# #...# .###.'], ['7', '##### ....# ...#. ..#.. .#... .#... .#...'],
+ ['8', '.###. #...# #...# .###. #...# #...# .###.'], ['9', '.###. #...# #...# .#### ....# ...#. .##..'],
+ [':', '..... ..... ..#.. ..... ..... ..#.. .....'], [';', '..... ..... ..#.. ..... ..... ..#.. ..#.. .#...'],
+ ['=', '..... ..... ##### ..... ##### ..... .....'], ['?', '.###. #...# ....# ...#. ..#.. ..... ..#..'],
+ ['A', '.###. #...# #...# ##### #...# #...# #...#'], ['B', '####. #...# #...# ####. #...# #...# ####.'],
+ ['C', '.###. #...# #.... #.... #.... #...# .###.'], ['D', '###.. #..#. #...# #...# #...# #..#. ###..'],
+ ['E', '##### #.... #.... ####. #.... #.... #####'], ['F', '##### #.... #.... ####. #.... #.... #....'],
+ ['G', '.###. #...# #.... #.### #...# #...# .####'], ['H', '#...# #...# #...# ##### #...# #...# #...#'],
+ ['I', '.###. ..#.. ..#.. ..#.. ..#.. ..#.. .###.'], ['J', '..### ...#. ...#. ...#. ...#. #..#. .##..'],
+ ['K', '#...# #..#. #.#.. ##... #.#.. #..#. #...#'], ['L', '#.... #.... #.... #.... #.... #.... #####'],
+ ['M', '#...# ##.## #.#.# #.#.# #...# #...# #...#'], ['N', '#...# #...# ##..# #.#.# #..## #...# #...#'],
+ ['O', '.###. #...# #...# #...# #...# #...# .###.'], ['P', '####. #...# #...# ####. #.... #.... #....'],
+ ['Q', '.###. #...# #...# #...# #.#.# #..#. .##.#'], ['R', '####. #...# #...# ####. #.#.. #..#. #...#'],
+ ['S', '.#### #.... #.... .###. ....# ....# ####.'], ['T', '##### ..#.. ..#.. ..#.. ..#.. ..#.. ..#..'],
+ ['U', '#...# #...# #...# #...# #...# #...# .###.'], ['V', '#...# #...# #...# #...# #...# .#.#. ..#..'],
+ ['W', '#...# #...# #...# #.#.# #.#.# #.#.# .#.#.'], ['X', '#...# #...# .#.#. ..#.. .#.#. #...# #...#'],
+ ['Y', '#...# #...# .#.#. ..#.. ..#.. ..#.. ..#..'], ['Z', '##### ....# ...#. ..#.. .#... #.... #####'],
+ ['_', '..... ..... ..... ..... ..... ..... ##### '], ['a', '..... ..... .###. ....# .#### #...# .####'],
+ ['b', '#.... #.... ####. #...# #...# #...# ####.'], ['c', '..... ..... .###. #.... #.... #...# .###.'],
+ ['d', '....# ....# .#### #...# #...# #...# .####'], ['e', '..... ..... .###. #...# ##### #.... .###.'],
+ ['f', '..##. .#... ###.. .#... .#... .#... .#...'], ['g', '..... ..... .#### #...# #...# #...# .#### ....# .###.'],
+ ['h', '#.... #.... #.##. ##..# #...# #...# #...#'], ['i', '..#.. ..... .##.. ..#.. ..#.. ..#.. .###.'],
+ ['j', '...#. ..... ..##. ...#. ...#. ...#. ...#. #..#. .##..'], ['k', '#.... #.... #..#. #.#.. ##... #.#.. #..#.'],
+ ['l', '.##.. ..#.. ..#.. ..#.. ..#.. ..#.. .###.'], ['m', '..... ..... ##.#. #.#.# #.#.# #.#.# #.#.#'],
+ ['n', '..... ..... #.##. ##..# #...# #...# #...#'], ['o', '..... ..... .###. #...# #...# #...# .###.'],
+ ['p', '..... ..... ####. #...# #...# #...# ####. #.... #....'], ['q', '..... ..... .#### #...# #...# #...# .#### ....# ....#'],
+ ['r', '..... ..... #.##. ##..# #.... #.... #....'], ['s', '..... ..... .#### #.... .###. ....# ####.'],
+ ['t', '.#... .#... ###.. .#... .#... .#..# ..##.'], ['u', '..... ..... #...# #...# #...# #..## .##.#'],
+ ['v', '..... ..... #...# #...# #...# .#.#. ..#..'], ['w', '..... ..... #...# #...# #.#.# #.#.# .#.#.'],
+ ['x', '..... ..... #...# .#.#. ..#.. .#.#. #...#'], ['y', '..... ..... #...# #...# #...# #...# .#### ....# .###.'],
+ ['z', '..... ..... ##### ...#. ..#.. .#... #####'],
+];
+const GL = new Uint8Array(96 * 9), GLL = new Uint8Array(96), GLW = new Uint8Array(96);
+let GAP = -1;
+for (const [ch, art] of FONT) {
+  const idx = ch.charCodeAt(0) - 32; let row = 0, col = 0;
+  for (const p of art) { if (row >= 9) break; if (p === ' ') { row++; col = 0; continue; } if (p === '#' && col < 5) GL[idx * 9 + row] |= 0x10 >> col; col++; }
+  let any = 0; for (let r = 0; r < 9; r++) any |= GL[idx * 9 + r];
+  let l = 0, rr = 4; while (l < 4 && !(any & (0x10 >> l))) l++; while (rr > l && !(any & (0x10 >> rr))) rr--;
+  GLL[idx] = l; GLW[idx] = rr - l + 1;
+}
+GLW[0] = 3;
+const gap = sc => GAP >= 0 ? GAP : sc;
+function gi(ch) { let c = ch.charCodeAt(0); if (c < 32 || c > 126) c = 63; let i = c - 32; if (GLW[i] === 0) i = 63 - 32; return i; }
+function gtextWidth(s, sc) { let w = 0; for (const ch of s) w += GLW[gi(ch)] * sc + gap(sc); return w > 0 ? w - gap(sc) : 0; }
+function gtext(x, y, s, c, sc) { let cx = x; for (const ch of s) { const i = gi(ch), l = GLL[i], w = GLW[i]; for (let r = 0; r < 9; r++) { const bits = GL[i * 9 + r]; if (!bits) continue; for (let k = 0; k < w; k++) if (bits & (0x10 >> (l + k))) gfill(cx + k * sc, y + r * sc, sc, sc, c); } cx += w * sc + gap(sc); } return cx > x ? cx - x - gap(sc) : 0; }
+function gtextCenter(cx, y, s, c, sc) { gtext(cx - ((gtextWidth(s, sc) / 2) | 0), y, s, c, sc); }
+function gtextGlow(x, y, s, c, glow, sc) { const g = sc >= 3 ? 2 : 1; for (let dy = -g; dy <= g; dy += g) for (let dx = -g; dx <= g; dx += g) if (dx || dy) gtext(x + dx, y + dy, s, glow, sc); gtext(x, y, s, c, sc); }
+function gtextCenterGlow(cx, y, s, c, glow, sc) { gtextGlow(cx - ((gtextWidth(s, sc) / 2) | 0), y, s, c, glow, sc); }
+
+/* =================== game: port of game_hustle.c ===================== */
+const W = GW, H = GH, HUD_H = 20, SKY_END = 84;
+const ROAD_X0 = 36, ROAD_X1 = 204, LANE_W = 56, CAR_W = 28, CAR_H = 48, CAR_Y = 252, SEG = 64;
+const V_TITLE = 95, V_START = 170, V_MAX = 440, V_ACCEL = 3.6, TRAFFIC_K = 0.72;
+const C = {
+  BLACK: rgb(0x000000), WHITE: rgb(0xF4F2FF), GRAY: rgb(0x9A98B0), PINK: rgb(0xFF2E97), PINK_D: rgb(0x7A0F4A),
+  TEAL: rgb(0x19F5E1), TEAL_D: rgb(0x0A5C63), PURPLE: rgb(0x9D4EDD), PURPLE_D: rgb(0x3C096C), YELLOW: rgb(0xFFD23F),
+  RED: rgb(0xFF3B4E), ROAD: rgb(0x1C1233), ROAD_P: rgb(0x140C26), ROAD_L: rgb(0x281B47), WALK: rgb(0x0C0816),
+  PAVE: rgb(0x2A2140), KERB_D: rgb(0x170A24), DASH: rgb(0x2DE2E6), LAMP: rgb(0xFFF1C1), POLE: rgb(0x5A5670),
+  POOL_T: rgb(0x1FB8B2), POOL_P: rgb(0xC8307E), BEAM: rgb(0xFFE9A8), GLOW_P: rgb(0xB0176A), SHADOW: rgb(0x05020A),
+  HOLE: rgb(0x05020A), HOLE_RIM: rgb(0x4A3B66), PANEL: rgb(0x0D0618), BOX: rgb(0x1C1C24), ERRBAR: rgb(0x8E1B22),
+  TANK: rgb(0x07070C), ACBOX: rgb(0x55536B), SHIMMER: rgb(0xC6FFF9), LOADGLOW: rgb(0x3A1030),
+};
+const ROOFS = [rgb(0x221338), rgb(0x2B1645), rgb(0x1D1A3A), rgb(0x301236)];
+
+const SPR_CAR = { w: 14, h: 24, mirror: true, rows: ['...kkkk', '..kllpt', '.kpllpt', '.kppppt', 'Gkppppt', 'Gkppppt', 'Gkppppt', 'Gkppppt', 'Gksssss', '.ksgsss', '.ksssss', '.kPPPPt', '.kPPPPt', '.kPPPPt', '.kPPPPt', '.ksssss', 'Gksssss', 'Gkppppt', 'Gkppppt', 'Gkppppt', 'Gkppppt', '.kppppt', '.krrppt', '..kkkkk'] };
+const SPR_AUTO = { w: 12, h: 18, mirror: true, rows: ['....kk', '...kyy', '...kyw', '..kyyy', '.kNNNN', '.kssss', '.kyyyy', 'kyyyyy', 'kyYyyy', 'kyyyyy', 'kyYyyy', 'kyyyyy', '.knnnn', 'Gknnnn', 'Gknnnn', 'Gkrnnn', '.kkkkk', '......'] };
+const SPR_BUS = { w: 16, h: 40, mirror: true, rows: ['kkkkkkkk', 'kwssssss', 'kvssssss', 'kvvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvggg', 'ktvvvgGg', 'ktvvvgGg', 'ktvvvggg', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvggg', 'ktvvvgGg', 'ktvvvgGg', 'ktvvvggg', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvggg', 'ktvvvgGg', 'ktvvvgGg', 'ktvvvggg', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'ktvvvvvv', 'kvvvvvvv', 'krvvvvvv', 'krvvvvvv', 'kkkkkkkk'] };
+const SPR_COW = { w: 12, h: 22, mirror: false, rows: ['....kkkk....', '...kqqqqk...', '...kcccck...', '...kkcckk...', '.hBkcccckBh.', 'h..kcccck..h', '....kcck....', '.kkcccccckk.', '.kccbbcccck.', '.kcbbbcccck.', '.kccbccbbck.', '.kccccbbbck.', '.kcccccbbck.', '.kbbcccccck.', '.kbbbccccck.', '.kcbbcccbck.', '.kcccccbbck.', '.kccccccbck.', '..kcccccck..', '...kkkkkk...', '.....b......', '.....b......'] };
+const SPR_LOUNGER = { w: 16, h: 7, mirror: false, rows: ['............ww..', '...........wPw..', '..........wPw...', '.........wPw....', 'wPwPwPwPwPw.....', 'k.........k.....', 'k.........k.....'] };
+
+const SC_GTA = 0, SC_ERR = 1, SC_PLANB = 2, SC_TITLE = 3, SC_PLAY = 4, SC_CRASH = 5;
+const OB_AUTO = 0, OB_BUS = 1, OB_COW = 2, OB_HOLE = 3;
+const OB_W = [24, 32, 24, 32], OB_H = [36, 80, 44, 16];
+const MAX_OB = 14, MAX_PART = 48, N_TW = 16;
+const SEA_Y = 172, DECK_Y = 202, POOL_Y = 232, BAND_Y = 252;
+
+const sky = new Uint32Array(GW * SKY_END), art = new Uint32Array(GW * GH);
+let rngS = 1, scene = SC_GTA, st = 0, time = 0, forceFull = 0;
+let lane = 1, carX = 0, v = 0, vT = 0, scroll = 0, segBase = 0, dist = 0, score = 0, best = 0, prevBest = 0, nextRow = 0, nextHole = 0, prevFree = 7;
+let shakeT = 0, shakeDur = 0, shakeAmp = 0, bumpT = 0, bannerT = 0, banner = '', playT = 0;
+let net4g = false;                       /* web only: colour of the 4G badge */
+const hooks = { crash: null };
+const ob = Array.from({ length: MAX_OB }, () => ({ active: false, hit: false, type: 0, lane: 0, y: 0, phase: 0 }));
+const part = Array.from({ length: MAX_PART }, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, c: 0 }));
+const tw = Array.from({ length: N_TW }, () => ({ x: 0, y: 0, c: 0 }));
+
+function rnd() { let x = rngS; x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; rngS = x; return x; }
+const frand = () => (rnd() >>> 8) * (1 / 16777216);
+const irand = n => rnd() % n;
+function hash32(x) { x >>>= 0; x ^= x >>> 16; x = Math.imul(x, 0x7FEB352D) >>> 0; x ^= x >>> 15; x = Math.imul(x, 0x846CA68B) >>> 0; x ^= x >>> 16; return x >>> 0; }
+const laneX = l => ROAD_X0 + LANE_W / 2 + l * LANE_W;
+const overlap = (ax, ay, aw, ah, bx, by, bw, bh) => ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
+function gotoScene(s) { scene = s; st = 0; forceFull = 2; }
+function shake(amp, dur) { if (shakeT <= 0 || amp >= shakeAmp * (shakeT / shakeDur)) { shakeAmp = amp; shakeDur = dur; shakeT = dur; } }
+function burst(x, y, n, speed, cols, life) {
+  for (let i = 0; i < MAX_PART && n > 0; i++) {
+    const p = part[i]; if (p.life > 0) continue;
+    const a = frand() * 6.2832, sp = speed * (0.35 + 0.65 * frand());
+    p.x = x; p.y = y; p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp; p.life = life * (0.6 + 0.4 * frand()); p.c = cols[irand(cols.length)]; n--;
+  }
+}
+function rgbDither(r, g, b, x, y) {
+  const t = (BAYER[y & 3][x & 3] + 0.5) / 16;
+  let r5 = (r / 8 + t) | 0, g6 = (g / 4 + t) | 0, b5 = (b / 8 + t) | 0;
+  return pack(r5 > 31 ? 31 : r5, g6 > 63 ? 63 : g6, b5 > 31 ? 31 : b5);
+}
+
+/* ---------------------------------------------------------- skyline */
+const ARCH = [3, 7, 11, 13, 15, 17, 19];
+function cmAt(x, y) {
+  if (x < 0 || x >= 60 || y < 0 || y >= 62) return 0;
+  let v = 0; const mx = x < 30 ? x : 59 - x;
+  if (mx >= 9 && mx <= 11 && y >= 8 && y <= 30) v = 1;
+  if (mx === 10 && y >= 5 && y <= 7) v = 1;
+  if (mx >= 8 && mx <= 12 && y >= 9 && y <= 10) v = 1;
+  const d = mx > 3 ? mx - 3 : 3 - mx;
+  if ((y <= 1 && d === 0) || (y >= 2 && y <= 3 && d <= 1) || (y === 4 && d <= 2) || (y >= 5 && y <= 6 && d <= 3) || (y === 7 && d <= 2) ||
+      (y === 8 && d <= 3) || (y >= 9 && d <= 2) || ((y === 15 || y === 16 || y === 26 || y === 27) && d <= 3)) v = 1;
+  if (x >= 6 && x <= 53) {
+    if (y >= 27) v = 1;
+    if (y >= 25 && y <= 26 && x >= 7 && x <= 52 && ((x - 7) % 4) < 2) v = 1;
+    if (y >= 30 && y <= 35 && x >= 8 && x <= 51) { const k = (x - 8) % 8; if (k < 4 && (y > 30 || k === 1 || k === 2)) v = 2; }
+    const ax = Math.abs(2 * x - 59);
+    if (y >= 38 && y <= 42 && ax <= ((y === 38 || y === 42) ? 3 : 5)) v = 2;
+    const lim = y >= 51 ? 19 : (y >= 44 ? ARCH[y - 44] : -1);
+    if (ax <= lim) v = 3;
+  }
+  return v;
+}
+function buildCharminar(ox, oy) {
+  const stone = rgb(0x0E0519), rimL = C.TEAL, rimR = C.PINK, lit = rgb(0xFFB347), a1 = rgb(0x7A2160), a2 = rgb(0x3A0E40);
+  for (let y = 0; y < 62; y++) for (let x = 0; x < 60; x++) {
+    const val = cmAt(x, y); if (!val) continue;
+    let c = stone;
+    if (val === 1) { const up = cmAt(x, y - 1), lf = cmAt(x - 1, y), rt = cmAt(x + 1, y); if (up === 0 || up === 3 || rt === 0 || rt === 3) c = rimR; else if (lf === 0 || lf === 3) c = rimL; }
+    else if (val === 2) c = lit;
+    else c = (y < 53 || ((x + y) & 1)) ? a1 : a2;
+    gpx(ox + x, oy + y, c);
+  }
+}
+function buildSky() {
+  const stops = [{ y: 0, r: 7, g: 2, b: 25 }, { y: 30, r: 18, g: 6, b: 58 }, { y: 62, r: 58, g: 13, b: 90 }, { y: SKY_END - 1, r: 142, g: 28, b: 110 }];
+  gtarget(sky); gclip(0, 0, W, SKY_END); rngS = 0xC0FFEE;
+  for (let y = 0; y < SKY_END; y++) {
+    let k = 0; while (k < 2 && y > stops[k + 1].y) k++;
+    const t = (y - stops[k].y) / (stops[k + 1].y - stops[k].y);
+    const r = stops[k].r + (stops[k + 1].r - stops[k].r) * t, g = stops[k].g + (stops[k + 1].g - stops[k].g) * t, b = stops[k].b + (stops[k + 1].b - stops[k].b) * t;
+    for (let x = 0; x < W; x++) sky[y * W + x] = rgbDither(r, g, b, x, y);
+  }
+  const starC = [rgb(0x8F8AAE), rgb(0x2A9C9A), rgb(0x9C3A78)];
+  for (let i = 0; i < 46; i++) { const x = irand(W), y = 2 + irand(52); gpx(x, y, starC[irand(3)]); }
+  gellipseDither(200, 42, 14, 14, rgb(0x2E1656));
+  const moon = rgb(0xFFF1C1);
+  for (let y = -9; y <= 9; y++) for (let x = -9; x <= 9; x++) { const inA = x * x + y * y <= 81, inB = (x - 4) * (x - 4) + (y + 3) * (y + 3) <= 64; if (inA && !inB) gpx(200 + x, 42 + y, moon); }
+  for (let x = 0; x < W;) { const bw = 8 + irand(14), bh = 14 + irand(22); gfill(x, SKY_END - bh, bw - 1, bh, rgb(0x1C0B33)); x += bw; }
+  const win = [rgb(0xC98A2E), rgb(0x1FA6A0), rgb(0xB8407E)];
+  for (let x = 0; x < W;) {
+    const bw = 10 + irand(16), bh = 8 + irand(16), top = SKY_END - bh;
+    gfill(x, top, bw - 1, bh, rgb(0x12072A));
+    for (let wy = top + 3; wy < SKY_END - 3; wy += 4) for (let wx = x + 2; wx < x + bw - 3; wx += 4) if (irand(5) === 0) gfill(wx, wy, 2, 2, win[irand(3)]);
+    x += bw;
+  }
+  buildCharminar(90, SKY_END - 62);
+  gfill(0, SKY_END - 2, W, 1, C.PINK_D); gfill(0, SKY_END - 1, W, 1, C.PINK);
+  const twC = [rgb(0xFFFFFF), C.TEAL, C.PINK];
+  for (let i = 0; i < N_TW;) {
+    const x = 2 + irand(W - 4), y = 3 + irand(44), mdx = x - 200, mdy = y - 42;
+    if ((y < 21 && (x < 150 || x > 204)) || (x > 84 && x < 156 && y > 18) || mdx * mdx + mdy * mdy < 225) continue;
+    tw[i].x = x; tw[i].y = y; tw[i].c = twC[i % 3]; i++;
+  }
+}
+function drawTwinkles(y0, y1) {
+  const ph = (time / 0.35) | 0;
+  for (let i = 0; i < N_TW; i++) {
+    const x = tw[i].x, y = tw[i].y; if (y < y0 || y >= y1) continue;
+    if ((i * 7 + ph) % 5 === 0) { gpx(x, y, C.WHITE); gpx(x - 1, y, tw[i].c); gpx(x + 1, y, tw[i].c); gpx(x, y - 1, tw[i].c); gpx(x, y + 1, tw[i].c); }
+    else gpx(x, y, tw[i].c);
+  }
+}
+
+/* -------------------------------------------------------------- road */
+function drawRoof(x, y, w, h, left) {
+  gfill(x, y + 1, w, SEG - 2, ROOFS[h & 3]);
+  if (h & 0x10) gellipse(x + 7 + ((h >>> 5) % 8), y + 14 + ((h >>> 9) % 30), 4, 4, C.TANK);
+  if (h & 0x20) gfill(x + 3 + ((h >>> 13) % 10), y + 8 + ((h >>> 17) % 40), 6, 5, C.ACBOX);
+  if (h & 0x40) { const c = (h & 0x80) ? C.PINK : ((h & 0x100) ? C.TEAL : C.YELLOW); gfill(left ? x + w - 3 : x + 1, y + 8, 2, 24 + ((h >>> 21) % 24), c); }
+}
+function drawRoad() {
+  gclip(0, SKY_END, W, H);
+  gfill(0, SKY_END, ROAD_X0, H - SKY_END, C.WALK); gfill(ROAD_X1, SKY_END, W - ROAD_X1, H - SKY_END, C.WALK); gfill(ROAD_X0, SKY_END, ROAD_X1 - ROAD_X0, H - SKY_END, C.ROAD);
+  const i0 = (scroll / SEG) | 0, i1 = ((scroll + (H - SKY_END)) / SEG | 0) + 1;
+  for (let i = i0; i <= i1; i++) {
+    const h = hash32((i + segBase) >>> 0), yb = H - ((i * SEG - scroll) | 0), yt = yb - SEG;
+    drawRoof(0, yt, 22, h, true); drawRoof(218, yt, 22, hash32(h), false);
+    const h2 = hash32((h ^ 0x5bd1e995) >>> 0);
+    for (let k = 0; k < 2; k++) {
+      const q = h2 >>> (k * 16);
+      const px = ROAD_X0 + 4 + ((q & 0xFF) % 150), py = yt + (((q >>> 8) & 0x3F) % 56);
+      gfill(px, py, 6 + (q % 11), 2 + (q & 1), (q & 4) ? C.ROAD_L : C.ROAD_P);
+    }
+  }
+  gfill(22, SKY_END, 8, H - SKY_END, C.PAVE); gfill(210, SKY_END, 8, H - SKY_END, C.PAVE);
+  const j0 = ((scroll / 128) | 0) - 1, j1 = ((scroll + (H - SKY_END)) / 128 | 0) + 1;
+  for (let j = j0; j <= j1; j++) {
+    const ly = H - ((j * 128 - scroll) | 0), left = (j & 1) === 0, px = left ? ROAD_X0 + 10 : ROAD_X1 - 10, pc = left ? C.POOL_T : C.POOL_P;
+    gellipseLevel(px, ly, 26, 15, pc, 2); gellipseLevel(px, ly, 15, 9, pc, 4);
+  }
+  const ph = (scroll % 64) | 0;
+  gfill(30, SKY_END, 6, H - SKY_END, C.KERB_D); gfill(204, SKY_END, 6, H - SKY_END, C.KERB_D);
+  for (let y = SKY_END - 64 + ph; y < H; y += 64) {
+    gfill(30, y, 6, 24, C.PINK); gfill(30, y + 32, 6, 24, C.TEAL); gfill(204, y, 6, 24, C.TEAL); gfill(204, y + 32, 6, 24, C.PINK);
+    gfill(91, y + 8, 3, 28, C.DASH); gfill(147, y + 8, 3, 28, C.DASH);
+  }
+  for (let j = j0; j <= j1; j++) {
+    const ly = H - ((j * 128 - scroll) | 0), lx = (j & 1) === 0 ? 26 : 213;
+    gfill(lx - 1, ly - 1, 3, 9, C.POLE); gfill(lx - 2, ly - 3, 5, 3, C.LAMP);
+  }
+}
+
+/* ----------------------------------------------------------- traffic */
+function obCx(o) { let x = laneX(o.lane); if (o.type === OB_AUTO) x += Math.sin(o.phase * 2.6) * 3; else if (o.type === OB_COW) x += Math.sin(o.phase * 1.1) * 2; return Math.round(x); }
+function obAlloc() { for (const o of ob) if (!o.active) { o.active = true; o.hit = false; o.type = 0; o.lane = 0; o.y = 0; o.phase = 0; return o; } return null; }
+function difficulty() { const d = (vT - V_START) / (V_MAX - V_START); return d < 0 ? 0 : d > 1 ? 1 : d; }
+function spawnRow() {
+  const d = difficulty(), n = frand() < 0.72 - 0.32 * d ? 1 : 2;
+  let blocked;
+  if (n === 1) blocked = 1 << irand(3);
+  else {
+    const cand = [];
+    for (let f = 0; f < 3; f++) { let ok = true; for (let pf = 0; pf < 3; pf++) if (((prevFree >> pf) & 1) && Math.abs(f - pf) > 1) ok = false; if (ok) cand.push(f); }
+    blocked = 7 & ~(1 << (cand.length ? cand[irand(cand.length)] : 1));
+  }
+  let hmax = 0;
+  for (let l = 0; l < 3; l++) {
+    if (!((blocked >> l) & 1)) continue;
+    const r = irand(100), t = r < 50 ? OB_AUTO : (r < 75 ? OB_COW : OB_BUS), o = obAlloc(); if (!o) continue;
+    const jit = irand(10); o.type = t; o.lane = l; o.y = SKY_END - OB_H[t] - jit; o.phase = frand() * 6.2832;
+    if (OB_H[t] + jit > hmax) hmax = OB_H[t] + jit;
+  }
+  prevFree = 7 & ~blocked;
+  nextRow = (hmax + CAR_H) + (175 - 70 * d) + frand() * 50;
+}
+function spawnHole() { const o = obAlloc(); if (o) { o.type = OB_HOLE; o.lane = irand(3); o.y = SKY_END - OB_H[OB_HOLE]; } nextHole = 380 + frand() * 520; }
+
+/* ---------------------------------------------------------- the game */
+function playReset() {
+  for (const o of ob) o.active = false; for (const p of part) p.life = 0;
+  lane = 1; carX = laneX(1); v = vT = V_START; dist = 0; score = 0; nextRow = 150; nextHole = 450; prevFree = 7; bumpT = 0; playT = 0;
+}
+function startPlay() { playReset(); gotoScene(SC_PLAY); }
+function advance(dt) { const d = v * dt; scroll += d; dist += d; if (scroll >= 65536) { scroll -= 65536; segBase = (segBase + 1024) >>> 0; } }
+function steer(dt) { const tx = laneX(lane), step = 760 * dt; if (carX < tx) carX = carX + step > tx ? tx : carX + step; else if (carX > tx) carX = carX - step < tx ? tx : carX - step; }
+const SPARKS = [C.PINK, C.TEAL, C.YELLOW, C.WHITE], DUST = [rgb(0x6E6488), rgb(0x463E5E)];
+function crash() {
+  gotoScene(SC_CRASH); forceFull = 0; v = 0; shake(7, 0.45); burst(carX, CAR_Y + 8, 30, 170, SPARKS, 0.8);
+  prevBest = best; if (score > best) best = score;
+  if (hooks.crash) hooks.crash(score, playT);
+}
+function playStep(dt, inp) {
+  if (inp.tap) { const old = lane; lane = inp.x < W / 2 ? Math.max(0, lane - 1) : Math.min(2, lane + 1); if (lane !== old) burst(carX, CAR_Y + CAR_H, 5, 50, DUST, 0.35); }
+  vT += V_ACCEL * dt; if (vT > V_MAX) vT = V_MAX;
+  if (v < vT) { v += 150 * dt; if (v > vT) v = vT; } else v = vT;
+  advance(dt); playT += dt; score = Math.floor(dist / 8); steer(dt);
+  const sv = v * TRAFFIC_K;
+  for (const o of ob) { if (!o.active) continue; o.y += (o.type === OB_HOLE ? v : sv) * dt; o.phase += dt; if (o.y > H) o.active = false; }
+  nextRow -= sv * dt; if (nextRow <= 0) spawnRow();
+  nextHole -= v * dt; if (nextHole <= 0) spawnHole();
+  const cx = Math.round(carX) - CAR_W / 2 + 5, cy = CAR_Y + 4, cw = CAR_W - 10, ch = CAR_H - 8;
+  for (const o of ob) {
+    if (!o.active) continue;
+    const ow = OB_W[o.type], oh = OB_H[o.type], ox = obCx(o) - (ow >> 1), oy = o.y | 0;
+    if (o.type === OB_HOLE) {
+      if (!o.hit && overlap(cx, cy, cw, ch, ox + 6, oy + 4, ow - 12, oh - 8)) { o.hit = true; v *= 0.55; shake(2.5, 0.2); bumpT = 0.7; burst(carX, CAR_Y + 6, 8, 70, DUST, 0.4); }
+    } else if (overlap(cx, cy, cw, ch, ox + 3, oy + 3, ow - 6, oh - 6)) { crash(); return; }
+  }
+}
+function updateParticles(dt) { for (const p of part) { if (p.life <= 0) continue; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96; p.life -= dt; } }
+
+/* ------------------------------------------------------------ drawing */
+function drawHud() {
+  gclip(0, 0, W, HUD_H); gcopyRows(sky, 0, HUD_H); drawTwinkles(0, HUD_H);
+  const title = scene === SC_TITLE;
+  if (!title || best) {
+    const lbl = title ? 'BEST' : 'SCORE', num = String(title ? best : score);
+    gtextGlow(5, 3, lbl, C.TEAL, C.TEAL_D, 2); gtextGlow(5 + gtextWidth(lbl, 2) + 8, 3, num, C.WHITE, C.PINK_D, 2);
+  }
+  /* web: where the phone has its close button, a 4G badge that lights up while the phone is online */
+  gfill(206, 1, 30, 18, C.PANEL); grect(206, 1, 30, 18, 1, net4g ? C.TEAL : C.GRAY); gtextCenter(221, 3, '4G', net4g ? C.TEAL : C.GRAY, 2);
+}
+function drawSkyBand() { gclip(0, HUD_H, W, SKY_END); gcopyRows(sky, HUD_H, SKY_END - HUD_H); drawTwinkles(HUD_H, SKY_END); }
+function drawHole(cx, top) { const cy = top + 8; gellipse(cx, cy, 15, 7, C.HOLE_RIM); gellipse(cx, cy + 1, 13, 6, C.HOLE); gfill(cx - 7, cy + 2, 4, 1, C.TEAL_D); gfill(cx + 3, cy, 3, 1, C.PINK_D); }
+function drawObjects() {
+  gclip(0, SKY_END, W, H);
+  for (const o of ob) if (o.active && o.type === OB_HOLE) drawHole(obCx(o), o.y | 0);
+  const carXi = Math.round(carX) - CAR_W / 2;
+  if (scene !== SC_CRASH) for (let r = 0; r < 56; r++) {
+    const y = CAR_Y - 1 - r, half = 2 + ((r * 2 / 9) | 0), lv = 6 - ((r / 11) | 0);
+    gfillLevel(carXi + 8 - half, y, 2 * half + 1, 1, C.BEAM, lv); gfillLevel(carXi + 20 - half, y, 2 * half + 1, 1, C.BEAM, lv);
+  }
+  const list = ob.filter(o => o.active && o.type !== OB_HOLE).sort((a, b) => a.y - b.y);
+  for (const o of list) {
+    const ow = OB_W[o.type], oh = OB_H[o.type], x = obCx(o) - (ow >> 1), y = Math.round(o.y);
+    gfillDither(x + 3, y + 5, ow, oh, C.SHADOW);
+    gsprite(o.type === OB_AUTO ? SPR_AUTO : o.type === OB_BUS ? SPR_BUS : SPR_COW, x, y, 2);
+  }
+  gellipseDither(carXi + CAR_W / 2, CAR_Y + CAR_H / 2, 19, 30, C.GLOW_P);
+  if (scene !== SC_CRASH || (((st * 10) | 0) & 1) === 0 || st > 1.2) gsprite(SPR_CAR, carXi, CAR_Y, 2);
+  for (const p of part) if (p.life > 0) gfill((p.x | 0) - 1, (p.y | 0) - 1, 2, 2, p.c);
+  if (bumpT > 0 && scene === SC_PLAY) { const rise = ((0.7 - bumpT) * 40) | 0; gtextCenterGlow(carXi + CAR_W / 2, CAR_Y - 20 - rise, 'BUMP!', C.YELLOW, C.PINK_D, 2); }
+}
+function drawTitle() {
+  gclip(0, SKY_END, W, H); gfillDither(8, 96, W - 16, 142, C.BLACK);
+  gtextCenterGlow(W / 2, 104, 'HYDERABAD', C.TEAL, C.TEAL_D, 3); gtextCenterGlow(W / 2, 132, 'HUSTLE', C.PINK, C.PURPLE_D, 4);
+  gtextCenter(W / 2, 174, 'Tap left / right', C.WHITE, 2); gtextCenter(W / 2, 194, 'to change lanes', C.WHITE, 2);
+  if ((((st * 2.5) | 0) & 1) === 0) gtextCenterGlow(W / 2, 220, 'TAP TO START', C.YELLOW, C.PINK_D, 2);
+}
+function drawCrashPanel() {
+  if (st < 0.5) return;
+  gclip(0, SKY_END, W, H);
+  gfill(20, 90, 200, 126, C.PANEL); grect(20, 90, 200, 126, 2, C.PINK); grect(24, 94, 192, 118, 1, C.TEAL_D);
+  gtextCenterGlow(W / 2, 100, 'CRASHED!', C.PINK, C.PURPLE_D, 3);
+  gtextCenter(W / 2, 130, 'Score ' + score, C.WHITE, 2); gtextCenter(W / 2, 150, 'Best ' + best, C.TEAL, 2);
+  if (prevBest && score > prevBest && (((st * 4) | 0) & 1) === 0) gtextCenter(W / 2, 170, 'NEW BEST!', C.YELLOW, 2);
+  if (st > 0.9 && (((st * 2.5) | 0) & 1) === 0) gtextCenter(W / 2, 192, 'Tap to restart', C.WHITE, 2);
+}
+function drawBanner() { if (bannerT <= 0) return; gclip(0, SKY_END, W, H); const w = gtextWidth(banner, 2) + 20; gfill(W / 2 - (w >> 1), 90, w, 20, C.TEAL); gtextCenter(W / 2, 93, banner, C.PANEL, 2); }
+
+/* ------------------------------------------------ sunset backdrop */
+function vgrad(x0, x1, y0, y1, s) {
+  for (let y = y0; y < y1; y++) {
+    let k = 0; while (k < s.length - 2 && y > s[k + 1][0]) k++;
+    let t = (y - s[k][0]) / (s[k + 1][0] - s[k][0]); t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const r = s[k][1] + (s[k + 1][1] - s[k][1]) * t, g = s[k][2] + (s[k + 1][2] - s[k][2]) * t, b = s[k][3] + (s[k + 1][3] - s[k][3]) * t;
+    for (let x = x0; x < x1; x++) gpx(x, y, rgbDither(r, g, b, x, y));
+  }
+}
+function frond(x0, y0, angDeg, len, droop, s, c) {
+  const a = angDeg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a), steps = (len * s) | 0;
+  let px = x0, py = y0;
+  for (let j = 1; j <= steps; j++) {
+    const t = j / steps, x = x0 + Math.round(dx * len * s * t), y = y0 + Math.round((dy * len * t + droop * t * t) * s);
+    gline(px, py, x, y, t < 0.4 ? 1 : 0, c);
+    if (j % 3 === 0 && t > 0.1) { const l = (12 * (1 - t) + 4) * s; gline(x, y, x + ((dx * l * 0.35 - l * 0.3) | 0), y + (l | 0), 0, c); gline(x, y, x + ((dx * l * 0.35 + l * 0.3) | 0), y + ((l * 0.8) | 0), 0, c); }
+    px = x; py = y;
+  }
+}
+const FR = [[-172, 58, 30], [-142, 52, 24], [-108, 40, 14], [-72, 42, 16], [-38, 54, 26], [-4, 60, 34], [28, 46, 30], [152, 46, 30]];
+function palm(bx, by, cx, cy, tx, ty, s) {
+  const c = rgb(0x22102F), ring = rgb(0x35194A); let lx = bx, ly = by;
+  for (let i = 1; i <= 64; i++) {
+    const t = i / 64, u = 1 - t, x = (u * u * bx + 2 * u * t * cx + t * t * tx) | 0, y = (u * u * by + 2 * u * t * cy + t * t * ty) | 0, r = ((4.5 - 2.2 * t) * s + 0.5) | 0;
+    gline(lx, ly, x, y, r, c); if (i % 3 === 0 && r > 1) gfill(x - r + 1, y, 2 * r - 1, 1, ring); lx = x; ly = y;
+  }
+  for (const f of FR) frond(tx, ty, f[0], f[1], f[2], s, c);
+  gellipse(tx, ty, (4 * s) | 0, (3 * s) | 0, c);
+}
+function buildSunset() {
+  gtarget(art); gclipAll();
+  vgrad(0, W, 0, SEA_Y, [[0, 0x2B, 0x1B, 0x5E], [55, 0x6A, 0x3D, 0x9A], [110, 0xE2, 0x60, 0x9E], [150, 0xFF, 0x8E, 0x6E], [SEA_Y - 1, 0xFF, 0xC2, 0x7A]]);
+  for (const [x, y, rx, ry, c, hi] of [[64, 44, 50, 3, 0x9A5BB0, 0xC98AD0], [176, 68, 62, 3, 0xB866AE, 0xE7A0CF], [78, 96, 46, 2, 0xE37BA8, 0xFFB3C8], [196, 114, 40, 2, 0xF08AA0, 0xFFC0B8]]) {
+    gellipse(x, y, rx, ry, rgb(c)); gfill(x - (rx >> 1), y - ry, rx, 1, rgb(hi));
+  }
+  const scx = 128, scy = 150, sr = 44;
+  for (let dy = -sr; dy <= sr; dy++) {
+    const y = scy + dy; if (y >= SEA_Y) break;
+    const k = dy + 10; if (k > 0 && (k % 7) < 1 + ((k / 9) | 0)) continue;
+    const hw = (sr * Math.sqrt(1 - (dy * dy) / (sr * sr)) + 0.5) | 0, t = (dy + sr) / (2 * sr);
+    for (let x = scx - hw; x <= scx + hw; x++) gpx(x, y, rgbDither(255, 244 - 133 * t, 176 - 79 * t, x, y));
+  }
+  gellipse(30, SEA_Y, 46, 7, rgb(0x4A2668));
+  vgrad(0, W, SEA_Y, DECK_Y, [[SEA_Y, 0x7C, 0x3F, 0x8F], [DECK_Y - 1, 0x43, 0x24, 0x6E]]);
+  gfill(scx - 46, SEA_Y, 93, 1, rgb(0xFFD29A));
+  for (let y = SEA_Y + 2; y < DECK_Y; y += 2) {
+    const hw = 10 + (((y - SEA_Y) * 11 / 10) | 0), c = (y & 2) ? rgb(0xFFC48A) : rgb(0xFF8FA0);
+    for (let x = scx - hw; x <= scx + hw; x++) if ((((x + y * 3) / 5) | 0) % 3 !== 0) gpx(x, y, c);
+  }
+  palm(30, SEA_Y, 32, 156, 36, 142, 0.45);
+  gfill(0, DECK_Y, W, POOL_Y - DECK_Y, rgb(0xF3C6A0));
+  for (let x = 8; x < W; x += 16) gfill(x, DECK_Y + 1, 1, POOL_Y - DECK_Y - 2, rgb(0xDDA882));
+  gfill(0, DECK_Y, W, 1, rgb(0xFFE6CC)); gfill(0, POOL_Y - 2, W, 2, rgb(0xB47C66));
+  gpal('w', rgb(0xFFF5EE)); gpal('P', rgb(0xFF7FB0)); gpal('k', rgb(0x6B4A5E));
+  gfill(108, 180, 2, POOL_Y - 182, rgb(0xEADFCF));
+  const um1 = rgb(0xFF5C9D), um2 = rgb(0xFFE9F0);
+  for (let dy = -13; dy <= 0; dy++) { const hw = (30 * Math.sqrt(1 - (dy * dy) / 169) + 0.5) | 0; for (let x = 109 - hw; x <= 109 + hw; x++) gpx(x, 182 + dy, ((((x - 109 + 70) / 10) | 0) & 1) ? um1 : um2); }
+  gfill(79, 182, 61, 1, rgb(0xC23A75));
+  gsprite(SPR_LOUNGER, 52, 212, 2); gsprite(SPR_LOUNGER, 146, 212, 2);
+  vgrad(0, W, POOL_Y, H, [[POOL_Y, 0x4F, 0xD6, 0xD8], [H - 1, 0x1C, 0x7F, 0xAF]]);
+  palm(8, 330, -8, 190, 44, 70, 1.0); palm(238, 330, 250, 210, 198, 100, 0.9);
+  gpal('w', C.WHITE); gpal('P', rgb(0xB3125F)); gpal('k', rgb(0x0A0612));
+}
+function drawGtaScreen(pct) {
+  gclipAll(); gcopyRows(art, 0, H);
+  const drift = (st * 16) | 0;
+  for (let i = 0; i < 4; i++) { const y = POOL_Y + 4 + i * 5; for (let x = -24 + (drift + i * 9) % 24; x < W; x += 24) gfill(x, y, 9 - i, 1, C.SHIMMER); }
+  gfillLevel(0, BAND_Y, W, H - BAND_Y, C.BLACK, 10); gfill(0, BAND_Y, W, 1, C.PINK);
+  gtextCenterGlow(W / 2, BAND_Y + 8, 'Loading GTA 6...', C.WHITE, C.LOADGLOW, 2);
+  grect(30, BAND_Y + 30, 180, 12, 1, C.WHITE);
+  const inner = (176 * pct / 100 + 0.5) | 0; if (inner > 0) gfill(32, BAND_Y + 32, inner, 8, C.WHITE);
+  gtextCenter(W / 2, BAND_Y + 48, (pct | 0) + '%', C.WHITE, 2);
+}
+const gtaPercent = t => t >= 3.2 ? 3 : 3 * (1 - (1 - t / 3.2) ** 2);
+const planbPercent = t => { if (t >= 1.5) return 100; const u = t / 1.5; return 100 * u * u * (3 - 2 * u); };
+function drawLoader(text, pct, bar) {
+  gtextCenter(W / 2, 122, text, C.WHITE, 2); grect(30, 150, 180, 14, 1, C.WHITE);
+  const inner = (176 * pct / 100 + 0.5) | 0; if (inner > 0) gfill(32, 152, inner, 10, bar);
+  gtextCenter(W / 2, 172, (pct | 0) + '%', C.GRAY, 2);
+}
+function drawErrorBox() {
+  const bx = 6, by = 84, bw = 228, bh = 156;
+  gfill(bx, by, bw, bh, C.BOX); grect(bx, by, bw, bh, 2, C.WHITE); gfill(bx + 2, by + 2, bw - 4, 24, C.ERRBAR);
+  gtext(bx + 10, by + 7, 'Error', C.WHITE, 2);
+  GAP = 1;
+  gtextCenter(W / 2, by + 40, 'Not enough storage.', C.WHITE, 2); gtextCenter(W / 2, by + 64, 'GTA 6 needs a PS5.', C.WHITE, 2); gtextCenter(W / 2, by + 88, 'This phone has 16 MB.', C.WHITE, 2);
+  GAP = -1;
+  grect(W / 2 - 30, by + bh - 36, 60, 24, 1, C.WHITE); gtextCenter(W / 2, by + bh - 31, 'OK', C.WHITE, 2);
+}
+function introFrame(inp) {
+  if (scene === SC_GTA) { if (st >= 4.2) gotoScene(SC_ERR); }
+  else if (scene === SC_ERR) { if ((st > 0.5 && inp.tap) || st > 4.5) gotoScene(SC_PLANB); }
+  else if (st >= 1.9) { playReset(); gotoScene(SC_TITLE); return; }
+  gclipAll();
+  if (scene === SC_GTA) drawGtaScreen(gtaPercent(st));
+  else if (scene === SC_ERR) { drawGtaScreen(3); gfillDither(0, 0, W, H, C.BLACK); drawErrorBox(); }
+  else { gfill(0, 0, W, H, C.BLACK); drawLoader('Loading Plan B...', planbPercent(st), C.TEAL); }
+}
+function ghInit() {
+  for (const [ch, h] of [['k', 0x0A0612], ['G', 0x3A3550], ['p', 0xFF2E97], ['P', 0xB3125F], ['t', 0x19F5E1], ['s', 0x261D52], ['g', 0x8C8CB4], ['l', 0xFFF6C8], ['r', 0xFF3B4E], ['w', 0xF4F2FF], ['y', 0xFFD23F], ['Y', 0xC9960C], ['N', 0x0F5E35], ['n', 0x2BC46A], ['v', 0xB8323C], ['c', 0xEEE6D2], ['b', 0x7A4A2A], ['B', 0x4A2C14], ['h', 0xD9CBA6], ['q', 0xD99A9A]]) gpal(ch, rgb(h));
+  buildSky(); buildSunset();
+}
+function ghReset(seed) { rngS = (seed >>> 0) || 1; time = 0; scroll = 0; segBase = 0; shakeT = 0; bannerT = 0; playReset(); gotoScene(SC_GTA); }
+function ghBanner(text) { banner = text; bannerT = 3; }
+function ghFrame(fb, dt, inp) {
+  dt = dt < 0 ? 0 : (dt > 0.05 ? 0.05 : dt);
+  gtarget(fb); time += dt; st += dt;
+  const out = { ox: 0, oy: 0 };
+  if (scene <= SC_PLANB) { introFrame(inp); if (scene <= SC_PLANB) return out; }
+  if (scene === SC_TITLE) { v = V_TITLE; advance(dt); steer(dt); if (inp.tap) startPlay(); }
+  else if (scene === SC_PLAY) playStep(dt, inp);
+  else if (scene === SC_CRASH && st > 0.9 && inp.tap) startPlay();
+  updateParticles(dt); bumpT -= dt; bannerT -= dt;
+  drawHud(); drawSkyBand(); drawRoad(); drawObjects();
+  if (scene === SC_TITLE) drawTitle(); else if (scene === SC_CRASH) drawCrashPanel();
+  drawBanner(); gclipAll();
+  if (shakeT > 0) {
+    const a = shakeAmp * (shakeT / shakeDur);
+    out.ox = Math.round((frand() * 2 - 1) * a); out.oy = Math.round((frand() * 2 - 1) * a);
+    shakeT -= dt; if (shakeT <= 0) { shakeT = 0; forceFull = 2; }
+  }
+  if (forceFull > 0) forceFull--;
+  return out;
+}
+
+/* ===================== screen, touch and keys ======================== */
+const cv = document.getElementById('game'), ctx = cv.getContext('2d', { alpha: false });
+const img = ctx.createImageData(GW, GH), FB = new Uint32Array(img.data.buffer);
+const taps = [];
+const typing = () => document.activeElement && document.activeElement.tagName === 'INPUT';
+const toastEl = document.getElementById('toast');
+let toastUp = false;
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  taps.push({ x: Math.min(GW - 1, Math.max(0, ((e.clientX - r.left) / r.width * GW) | 0)), y: Math.min(GH - 1, Math.max(0, ((e.clientY - r.top) / r.height * GH) | 0)) });
+  if (typing()) document.activeElement.blur();
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('keydown', e => {
+  if (typing() || e.repeat) return;
+  const k = e.key;
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') taps.push({ x: 20, y: 200 });
+  else if (k === 'ArrowRight' || k === 'd' || k === 'D') taps.push({ x: 220, y: 200 });
+  else if ((k === ' ' || k === 'Enter') && scene !== SC_PLAY) taps.push({ x: 120, y: 200 });
+  else return;
+  e.preventDefault();
+});
+ghInit();
+ghReset((Math.random() * 4294967295) >>> 0);
+let last = performance.now();
+function loop(now) {
+  const dt = (now - last) / 1000; last = now;
+  const tp = taps.shift();
+  const o = ghFrame(FB, dt, tp ? { pressed: true, tap: true, x: tp.x, y: tp.y } : { pressed: false, tap: false, x: 0, y: 0 });
+  if (o.ox || o.oy) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, GW, GH); }
+  ctx.putImageData(img, o.ox, o.oy);
+  const up = scene === SC_PLAY;                       /* keep messages off the road while driving */
+  if (up !== toastUp) { toastUp = up; toastEl.classList.toggle('up', up); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ===================== live log for local testing ===================== */
+const dbgEl = document.getElementById('dbg'), dbgLines = [];
+function dbg(s) {
+  if (!DEBUG) return;
+  dbgLines.push(new Date().toTimeString().slice(0, 8) + '  ' + s);
+  if (dbgLines.length > 40) dbgLines.shift();
+  dbgEl.hidden = false; dbgEl.textContent = 'Live log (only shown when the page is opened from a file)\n' + dbgLines.join('\n');
+}
+
+/* ========== MQTT 3.1.1 over WebSocket (connect, subscribe, QoS 0/1) ========== */
+const te = new TextEncoder(), td = new TextDecoder();
+const u8 = (...a) => Uint8Array.from(a);
+function cat(...p) { let n = 0; for (const x of p) n += x.length; const o = new Uint8Array(n); let i = 0; for (const x of p) { o.set(x, i); i += x.length; } return o; }
+function mstr(s) { const b = te.encode(s); return cat(u8(b.length >> 8, b.length & 255), b); }
+function pk(type, body) { const l = []; let n = body.length; do { let d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; l.push(d); } while (n > 0); return cat(u8(type), Uint8Array.from(l), body); }
+class Mq {
+  constructor(url, cid, onMsg, onState) { Object.assign(this, { url, cid, onMsg, onState }); this.up = false; this.subs = new Set(); this.out = []; this.fly = new Map(); this.mid = 0; this.wait = 1000; this.buf = new Uint8Array(0); }
+  connect() {
+    let ws;
+    try { ws = new WebSocket(this.url, ['mqtt']); } catch (e) { this.onState('down'); this.retry(); return; }
+    this.ws = ws; ws.binaryType = 'arraybuffer'; this.buf = new Uint8Array(0);
+    ws.onopen = () => { dbg('server: connected, logging in'); this.raw(pk(0x10, cat(mstr('MQTT'), u8(4, 0x02, 0, 90), mstr(this.cid)))); };
+    ws.onmessage = e => { if (e.data instanceof ArrayBuffer) this.feed(new Uint8Array(e.data)); };
+    ws.onclose = e => { dbg('server: closed (' + e.code + ')'); this.up = false; clearInterval(this.ping); this.onState('down'); this.retry(); };
+    ws.onerror = () => {};
+  }
+  retry() { clearTimeout(this.rt); this.rt = setTimeout(() => this.connect(), this.wait); this.wait = Math.min(this.wait * 2, 20000); }
+  raw(b) { try { if (this.ws && this.ws.readyState === 1) this.ws.send(b); } catch (e) { /* closed */ } }
+  id() { this.mid = this.mid % 65535 + 1; return this.mid; }
+  subscribe(t) { if (this.subs.has(t)) return; this.subs.add(t); if (this.up) this.sendSub(t); }
+  sendSub(t) { const i = this.id(); this.raw(pk(0x82, cat(u8(i >> 8, i & 255), mstr(t), u8(1)))); }
+  publish(t, msg, qos, retain, onAck) { const m = { t, msg, qos, retain, onAck, i: 0 }; dbg('send ' + t.replace(PFX, '') + ' ' + msg.slice(0, 70)); if (this.up) this.sendPub(m, false); else this.out.push(m); }
+  sendPub(m, dup) {
+    if (m.qos && !m.i) m.i = this.id();
+    if (m.qos) this.fly.set(m.i, m);
+    this.raw(pk(0x30 | (dup ? 8 : 0) | (m.qos << 1) | (m.retain ? 1 : 0), cat(mstr(m.t), m.qos ? u8(m.i >> 8, m.i & 255) : new Uint8Array(0), te.encode(m.msg))));
+    if (!m.qos && m.onAck) m.onAck();
+  }
+  feed(chunk) {
+    this.buf = this.buf.length ? cat(this.buf, chunk) : chunk;
+    for (;;) {
+      const b = this.buf; if (b.length < 2) return;
+      let mul = 1, len = 0, i = 1, x;
+      do { if (i >= b.length) return; x = b[i++]; len += (x & 127) * mul; mul *= 128; if (mul > 268435456) { this.ws.close(); return; } } while (x & 128);
+      if (b.length < i + len) return;
+      const type = b[0], body = b.subarray(i, i + len);
+      this.buf = b.slice(i + len);
+      this.handle(type, body);
+    }
+  }
+  handle(type, b) {
+    switch (type >> 4) {
+      case 2:  /* CONNACK */
+        if (b[1] !== 0) { dbg('server: login refused, code ' + b[1]); this.ws.close(); return; }
+        this.up = true; this.wait = 1000; this.onState('up');
+        dbg('server: logged in'); clearInterval(this.ping); this.ping = setInterval(() => this.raw(u8(0xC0, 0)), 30000);
+        for (const t of this.subs) this.sendSub(t);
+        for (const m of this.fly.values()) this.sendPub(m, true);
+        for (const m of this.out.splice(0)) this.sendPub(m, false);
+        break;
+      case 3: { /* PUBLISH */
+        const qos = (type >> 1) & 3, tl = (b[0] << 8) | b[1], topic = td.decode(b.subarray(2, 2 + tl));
+        let p = 2 + tl, i = 0;
+        if (qos) { i = (b[p] << 8) | b[p + 1]; p += 2; }
+        if (qos === 1) this.raw(pk(0x40, u8(i >> 8, i & 255)));
+        if (qos === 2) return;                       /* never subscribed with QoS 2 */
+        const txt = td.decode(b.subarray(p));
+        dbg('got ' + topic.replace(PFX, '') + (type & 1 ? ' (stored)' : ' (live)') + ' ' + txt.slice(0, 70));
+        try { this.onMsg(topic, txt, !!(type & 1)); } catch (e) { console.warn(e); }
+        break;
+      }
+      case 4: { /* PUBACK */ const i = (b[0] << 8) | b[1], m = this.fly.get(i); if (m) { this.fly.delete(i); if (m.onAck) m.onAck(); } break; }
+      case 9: dbg('subscribed, code ' + Array.from(b.subarray(2)).join(',')); break;
+      default: break;                                /* PINGRESP */
+    }
+  }
+}
+
+/* ============================ the 4G link ============================ */
+const $ = id => document.getElementById(id);
+const pill = $('pill'), pillText = pill.querySelector('span'), nameEl = $('name'), sendBtn = $('send'), hintEl = $('hint');
+const resultEl = $('result'), boardEl = $('board'), playsEl = $('plays'), phoneBestEl = $('phoneBest'), myBestEl = $('myBest');
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, val) { try { localStorage.setItem(k, val); } catch (e) { /* private mode */ } } };
+const fmt = n => Number(n).toLocaleString('en-IN');
+const HINT = "Up to 12 letters or numbers. It shows on the phone's screen.";
+const PHONE_TEXT = { checking: 'Checking the phone…', online: 'Phone is online', offline: 'Phone is off right now', noserver: "Can't reach the score server" };
+
+let phone = 'checking', lastLive = 0, upAt = 0, myBest = 0, sentBest = 0, lastSend = 0, sendTimer = 0, toastTimer = 0, boardTop = [];
+/* box: the best score this browser still owes the phone. It stays in localStorage until the phone
+   answers, because the score server does not keep messages for a phone that is switched off. */
+let box = null;
+const acks = new Map();
+function saveBox() { store.set('hh_box', box ? JSON.stringify({ score: box.score, t: box.t, id: box.id || '' }) : ''); }
+function loadBox() {
+  try {
+    const b = JSON.parse(store.get('hh_box') || 'null');
+    if (b && Number.isInteger(b.score) && b.score >= 1 && Number.isInteger(b.t) && b.t >= 1 && b.t <= 3600)
+      box = { score: b.score, t: b.t, id: /^[a-z0-9]{8}$/.test(b.id || '') ? b.id : null, flying: false };
+  } catch (e) { box = null; }
+}
+
+function setPhone(s) {
+  if (phone === s) return;
+  phone = s; pill.dataset.s = s; pillText.textContent = PHONE_TEXT[s]; net4g = s === 'online';
+  dbg('phone status: ' + s);
+  if (!box) return;
+  if (s === 'online') setTimeout(trySend, 400);
+  else { box.flying = false; holdMsg(); }      /* sent again (same id) once the phone is back */
+}
+function toast(text, kind, ms) {
+  toastEl.textContent = text; toastEl.dataset.k = kind || 'info'; toastEl.hidden = false; resultEl.textContent = text;
+  clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(() => { toastEl.hidden = true; }, ms);
+}
+function cleanName() { return nameEl.value.trim().replace(/\s+/g, ' '); }
+function nameProblem(n) {
+  if (!n) return 'empty';
+  if (!/^[A-Za-z0-9 _.\-]{1,12}$/.test(n)) return 'Use only letters, numbers, space, _ . or - (up to 12).';
+  if (/^homemade/i.test(n)) return 'That name belongs to the phone. Pick another one.';
+  return '';
+}
+function rid(n) { const a = 'abcdefghijklmnopqrstuvwxyz0123456789', b = new Uint8Array(n); crypto.getRandomValues(b); let s = ''; for (const x of b) s += a[x % 36]; return s; }
+
+function refreshName() {
+  const p = nameProblem(cleanName());
+  hintEl.textContent = p && p !== 'empty' ? p : HINT; hintEl.classList.toggle('bad', !!p && p !== 'empty');
+  sendBtn.hidden = !box || box.flying; sendBtn.disabled = !!p;
+  if (box) sendBtn.textContent = 'Send ' + fmt(box.score);
+  renderBoard();
+}
+nameEl.addEventListener('input', refreshName);
+nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); trySend(); } });
+nameEl.addEventListener('change', () => { if (!nameProblem(cleanName())) store.set('hh_name', cleanName()); });
+sendBtn.addEventListener('click', () => trySend());
+
+hooks.crash = (sc, t) => {
+  if (sc > myBest) { myBest = sc; store.set('hh_best', String(sc)); myBestEl.textContent = fmt(sc); }
+  if (sc >= 1 && sc > sentBest && (!box || sc > box.score)) { box = { score: sc, t: Math.max(1, Math.ceil(t)), id: null, flying: false }; saveBox(); }
+  else if (!box || box.flying) { if (sentBest) toast('Beat ' + fmt(sentBest) + ' to send a new score to the phone.', 'info', 4000); return; }
+  refreshName();
+  trySend();
+};
+
+function holdMsg() {
+  if (!box) return;
+  const s = fmt(box.score);
+  if (phone === 'offline') toast('The phone is off right now. Your ' + s + ' waits here and goes to the phone as soon as it is back on.', 'info', 9000);
+  else if (phone === 'checking') toast('Checking if the phone is on…', 'info', 0);
+  else toast("Can't reach the score server. Your " + s + ' waits here.', 'bad', 9000);
+}
+function trySend() {
+  if (!box || box.flying) return;
+  const n = cleanName(), p = nameProblem(n);
+  if (p) {
+    refreshName();
+    toast(p !== 'empty' ? p : 'Type your name under the game to send ' + fmt(box.score) + ' to the phone.', p !== 'empty' ? 'bad' : 'info', 6000);
+    return;
+  }
+  store.set('hh_name', n);
+  if (phone !== 'online') { holdMsg(); refreshName(); return; }
+  const wait = lastSend + SEND_GAP_MS - Date.now();
+  if (wait > 0) {
+    clearTimeout(sendTimer); sendTimer = setTimeout(trySend, wait);
+    toast('New best! It goes to the phone in a few seconds.', 'info', 4000); refreshName(); return;
+  }
+  if (!box.id) box.id = rid(8);
+  box.flying = true; saveBox();
+  const { score: s, t, id } = box;
+  sentBest = Math.max(sentBest, s); lastSend = Date.now(); refreshName();
+  let rec = acks.get(id);
+  if (!rec) { rec = { id, s, t, done: false, timer: 0, tries: 0 }; acks.set(id, rec); }
+  rec.tries++;
+  mq.subscribe(PFX + 'ack/' + id);
+  toast('Sending ' + fmt(s) + ' to the phone…', 'info', 0);
+  mq.publish(PFX + 'scores', JSON.stringify({ v: 1, id, name: n, score: s, t }), 1, false, () => {
+    if (rec.done) return;
+    toast('Sent over the internet. Waiting for the phone…', 'info', 0);
+    clearTimeout(rec.timer); rec.timer = setTimeout(() => noReply(rec), ACK_WAIT_MS);
+  });
+}
+function noReply(rec) {
+  if (rec.done) return;
+  if (box && box.id === rec.id) box.flying = false;
+  if (phone !== 'online') { holdMsg(); return; }
+  if (rec.tries < 3) { toast('No answer from the phone yet. Trying again…', 'info', 0); setTimeout(trySend, 2000); }
+  else { toast('The phone is not answering. Your score stays saved here for next time.', 'bad', 9000); refreshName(); }
+}
+function onAck(id, j) {
+  const rec = acks.get(id); if (!rec || rec.done) return;
+  rec.done = true; clearTimeout(rec.timer);
+  if (box && box.id === id) { box = null; saveBox(); }
+  if (j.ok === true) {
+    const r = j.rank | 0;
+    let m = r > 0 ? 'It just popped up on the phone. You are #' + r + ' on the board!' : 'It just popped up on the phone. Not in the top 10 yet.';
+    if (j.shown === false) m = 'The phone saved your score, but it was too busy to show it.';
+    toast(m, 'good', 8000);
+    if (scene === SC_PLAY) ghBanner(r > 0 ? 'ON THE PHONE #' + r : 'ON THE PHONE');
+  } else {
+    const why = { name: 'The phone refused that name. Change it and press Send.', score: "The phone didn't believe that score.", slow: 'Too quick for the phone. Sending again in a few seconds…' }[j.why];
+    toast(why || 'The phone said no this time.', 'bad', 8000);
+    if ((j.why === 'name' || j.why === 'slow') && (!box || rec.s > box.score)) { box = { score: rec.s, t: rec.t, id: null, flying: false }; saveBox(); }
+    if (j.why === 'slow') { clearTimeout(sendTimer); sendTimer = setTimeout(trySend, SEND_GAP_MS); }
+  }
+  refreshName();
+}
+
+function onBoard(j) {
+  if (!j || !Array.isArray(j.top)) return;
+  boardTop = j.top.filter(e => e && typeof e.n === 'string' && Number.isFinite(e.s)).slice(0, 10).map(e => ({ n: e.n.slice(0, 16), s: Math.max(0, Math.floor(e.s)) }));
+  playsEl.textContent = Number.isFinite(j.plays) && j.plays > 0 ? fmt(j.plays) + (j.plays === 1 ? ' score' : ' scores') + ' sent to the phone so far' : '';
+  renderBoard();
+}
+function renderBoard() {
+  if (!boardTop) return;
+  const me = cleanName().toLowerCase(), items = [];
+  for (const e of boardTop) {
+    const li = document.createElement('li'), n = document.createElement('span'), s = document.createElement('span');
+    if (e.n === PHONE) li.className = 'phone'; else if (me && e.n.toLowerCase() === me) li.className = 'me';
+    n.className = 'n'; n.textContent = e.n; s.className = 's'; s.textContent = fmt(e.s);
+    li.append(n, s); items.push(li);
+  }
+  if (!items.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'No scores yet. Be the first!'; items.push(li); }
+  boardEl.replaceChildren(...items);
+  const ph = boardTop.find(e => e.n === PHONE);
+  phoneBestEl.textContent = ph ? fmt(ph.s) : '–';
+}
+
+function onMsg(topic, payload, retained) {
+  let j; try { j = JSON.parse(payload); } catch (e) { return; }
+  if (!j || typeof j !== 'object') return;
+  if (topic === PFX + 'status') {
+    if (j.online === true && !retained) { lastLive = Date.now(); setPhone('online'); }
+    else if (j.online === false) setPhone('offline');
+  } else if (topic === PFX + 'leaderboard') onBoard(j);
+  else if (topic.startsWith(PFX + 'ack/')) onAck(topic.slice(PFX.length + 4), j);
+}
+const mq = new Mq(BROKER, 'hhweb-' + rid(8), onMsg, s => {
+  if (s === 'up') { upAt = Date.now(); if (phone === 'noserver') setPhone('checking'); }
+  else setPhone('noserver');
+});
+const seenEl = $('seen');
+setInterval(() => {
+  const ago = lastLive ? Math.round((Date.now() - lastLive) / 1000) : -1;
+  seenEl.textContent = ago < 0 ? '' : phone === 'online' ? '· ' + ago + ' s ago' : phone === 'offline' ? '· last seen ' + (ago < 120 ? ago + ' s' : Math.round(ago / 60) + ' min') + ' ago' : '';
+  if (!mq.up) return;
+  if (phone === 'online' && Date.now() - lastLive > LIVE_MS) setPhone('offline');
+  if (phone === 'checking' && Date.now() - upAt > CHECK_MS) setPhone('offline');
+}, 1000);
+
+nameEl.value = store.get('hh_name') || '';
+loadBox();
+if (box) resultEl.textContent = 'Your score of ' + fmt(box.score) + ' is waiting to go to the phone.';
+myBest = best = Math.max(0, parseInt(store.get('hh_best') || '0', 10) || 0);
+myBestEl.textContent = fmt(myBest);
+boardTop = null;
+refreshName();
+mq.subscribe(PFX + 'status'); mq.subscribe(PFX + 'leaderboard');
+mq.connect();
+setTimeout(() => { if (boardTop === null && boardEl.firstElementChild && boardEl.firstElementChild.classList.contains('empty')) boardEl.firstElementChild.textContent = 'No leaderboard yet. The phone posts it when it comes online.'; }, 12000);
+}
+</script>
+</body>
+</html>
